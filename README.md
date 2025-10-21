@@ -1,6 +1,6 @@
 # 🧠 String Analyzer API
 
-A RESTful API built with FastAPI + PostgreSQL that analyzes and stores string properties. Built for HNGx Internship (Stage 1 - Backend Wizards).
+A RESTful API built with FastAPI + PostgreSQL that analyzes and stores string properties. Built for HNGx Internship (Stage 1 - Backend).
 
 ---
 
@@ -90,8 +90,8 @@ Returns parsed filters like:
 ### ✅ Clone the repo
 
 ```bash
-git clone https://github.com/your-username/string-analyzer-api.git
-cd string-analyzer
+git clone https://github.com/Katsayal/stringanalyzer.git
+cd stringanalyzer
 ```
 
 ### ✅ Set up virtual environment (optional)
