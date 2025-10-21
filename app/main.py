@@ -11,6 +11,22 @@ from app.filters import parse_natural_language
 
 app = FastAPI()
 
+@app.get("/", tags=["Root"])
+def root():
+    return {
+        "message": "Welcome to the String Analyzer API!",
+        "endpoints": {
+            "POST /strings": "Analyze and store a string",
+            "GET /strings/{value}": "Retrieve analysis of a specific string",
+            "GET /strings": "Retrieve all strings with optional query filtering",
+            "GET /strings/filter-by-natural-language?query=...": "Filter using natural language queries like 'all single word palindromic strings'",
+            "DELETE /strings/{value}": "Delete a string from the database",
+            "GET /docs": "Interactive API documentation (Swagger UI)",
+            "GET /redoc": "Alternative API documentation (ReDoc)"
+        },
+        "note": "Use the /docs endpoint to try the API interactively."
+    }
+
 @app.post("/strings", response_model=schemas.StringResponse, status_code=status.HTTP_201_CREATED)
 async def analyze_string(payload: schemas.StringCreate, db: AsyncSession = Depends(get_db)):
     new_string = await crud.create_analyzed_string(db, payload)

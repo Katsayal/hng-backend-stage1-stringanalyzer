@@ -90,7 +90,7 @@ Returns parsed filters like:
 ### ✅ Clone the repo
 
 ```bash
-git clone https://github.com/Katsayal/stringanalyzer.git
+git clone https://github.com/Katsayal/hng-backend-stage1-stringanalyzer
 cd stringanalyzer
 ```
 
