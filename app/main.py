@@ -1,15 +1,34 @@
 from fastapi import FastAPI, Depends, status, Query, Response, HTTPException
 from fastapi.responses import JSONResponse
-from typing import List, Optional
-from .database import engine
-from . import models
+from fastapi.middleware.cors import CORSMiddleware
+from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 from app import models, schemas, crud
-from app.database import get_db
+from app.database import get_db, engine
 from app.filters import parse_natural_language
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Create database tables on startup
+@app.on_event("startup")
+async def startup_event():
+    async with engine.begin() as conn:
+        await conn.run_sync(models.Base.metadata.create_all)
 
 @app.get("/", tags=["Root"])
 def root():
@@ -29,21 +48,28 @@ def root():
 
 @app.post("/strings", response_model=schemas.StringResponse, status_code=status.HTTP_201_CREATED)
 async def analyze_string(payload: schemas.StringCreate, db: AsyncSession = Depends(get_db)):
-    new_string = await crud.create_analyzed_string(db, payload)
-
-    return {
-        "id": new_string.id,
-        "value": new_string.value,
-        "properties": {
-            "length": new_string.length,
-            "is_palindrome": new_string.is_palindrome,
-            "unique_characters": new_string.unique_characters,
-            "word_count": new_string.word_count,
-            "sha256_hash": new_string.sha256_hash,
-            "character_frequency_map": new_string.character_frequency_map,
-        },
-        "created_at": new_string.created_at
-    }
+    try:
+        new_string = await crud.create_analyzed_string(db, payload)
+        return {
+            "id": new_string.id,
+            "value": new_string.value,
+            "properties": {
+                "length": new_string.length,
+                "is_palindrome": new_string.is_palindrome,
+                "unique_characters": new_string.unique_characters,
+                "word_count": new_string.word_count,
+                "sha256_hash": new_string.sha256_hash,
+                "character_frequency_map": new_string.character_frequency_map,
+            },
+            "created_at": new_string.created_at
+        }
+    except HTTPException as e:
+        raise e
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail="String already exists.")
+    except Exception as e:
+        logger.error(f"Error creating string: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/strings/filter-by-natural-language")
 async def filter_by_natural_language(query: str, db: AsyncSession = Depends(get_db)):
@@ -77,7 +103,7 @@ async def filter_by_natural_language(query: str, db: AsyncSession = Depends(get_
             "created_at": s.created_at
         })
 
-    # ✅ Return even if data is empty
+    # Return even if data is empty
     return {
         "data": data,
         "count": len(data),
@@ -90,22 +116,28 @@ async def filter_by_natural_language(query: str, db: AsyncSession = Depends(get_
 @app.get("/strings/{value}", response_model=schemas.StringResponse)
 async def get_string(value: str, db: AsyncSession = Depends(get_db)):
     if value == "filter-by-natural-language":
-        raise HTTPException(status_code=404, detail="Invalid string value.")
+        raise HTTPException(status_code=404, detail="String not found.")
     
-    string = await crud.get_string_by_value(db, value)
-    return {
-        "id": string.id,
-        "value": string.value,
-        "properties": {
-            "length": string.length,
-            "is_palindrome": string.is_palindrome,
-            "unique_characters": string.unique_characters,
-            "word_count": string.word_count,
-            "sha256_hash": string.sha256_hash,
-            "character_frequency_map": string.character_frequency_map,
-        },
-        "created_at": string.created_at
-    }
+    try:
+        string = await crud.get_string_by_value(db, value)
+        return {
+            "id": string.id,
+            "value": string.value,
+            "properties": {
+                "length": string.length,
+                "is_palindrome": string.is_palindrome,
+                "unique_characters": string.unique_characters,
+                "word_count": string.word_count,
+                "sha256_hash": string.sha256_hash,
+                "character_frequency_map": string.character_frequency_map,
+            },
+            "created_at": string.created_at
+        }
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error getting string: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/strings")
 async def get_filtered_strings(
@@ -147,7 +179,13 @@ async def get_filtered_strings(
         "filters_applied": {k: v for k, v in filters_applied.items() if v is not None}
     }
 
-@app.delete("/strings/{value}", status_code=204)
+@app.delete("/strings/{value}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_string(value: str, db: AsyncSession = Depends(get_db)):
-    await crud.delete_string_by_value(db, value)
-    return Response(status_code=204)
+    try:
+        await crud.delete_string_by_value(db, value)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error deleting string: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
