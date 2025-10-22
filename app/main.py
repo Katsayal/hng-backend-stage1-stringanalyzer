@@ -5,7 +5,7 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from app import models, schemas, crud
-from app.database import get_db, engine
+from app.database import Base, get_db, engine
 from app.filters import parse_natural_language
 import logging
 
@@ -24,11 +24,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create database tables on startup
 @app.on_event("startup")
 async def startup_event():
-    async with engine.begin() as conn:
-        await conn.run_sync(models.Base.metadata.create_all)
+    try:
+        # Create tables if they don't exist
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Error creating database tables: {e}")
+        raise
 
 @app.get("/", tags=["Root"])
 def root():
